@@ -404,7 +404,7 @@ function! todo#CreateNewRecurrence(triggerOnNonStrict)
         return
     endif
 
-    let l:rec_date_rex = '\v\c(^|\s)rec:(\+)?(\d+)([dwmy])(\s|$)'
+    let l:rec_date_rex = '\v\c(^|\s)rec:(\+)?(\d+)([dwmy]|wd)(\s|$)'
     let l:rec_parts = matchlist(l:currentline, l:rec_date_rex)
     " Don't operate on tasks without a valid "rec:" keyword.
     if empty(l:rec_parts)
@@ -561,7 +561,7 @@ function! todo#DateAdd(year, month, day, units, unit_type)
     " all that scary to roll our own - we just need to watch out for leap years.
 
     " Check and clean up input
-    if index(["d", "D", "w", "W", "m", "M", "y", "Y"], a:unit_type) < 0
+    if index(["d", "D", "w", "W", "m", "M", "y", "Y", "wd", "WD"], a:unit_type) < 0
         throw 'Invalid unit "'. a:unit_type . '" passed to todo#DateAdd()'
     endif
 
@@ -626,7 +626,7 @@ function! todo#DateAdd(year, month, day, units, unit_type)
     "     let l:d = l:daysInMonth
     " endif
 
-    if l:utype ==? "d"
+    if l:utype ==? "d" || l:utype ==? "wd"
         " Adding DAYS
         while l:i > 0
             let l:d += 1
@@ -639,7 +639,10 @@ function! todo#DateAdd(year, month, day, units, unit_type)
                 endif
                 let l:daysInMonth = todo#GetDaysInMonth(l:m, l:y)
             endif
-            let l:i -= 1
+
+            if l:utype ==? "d" || todo#GetWeekday(l:y, l:m, l:d) < 6
+                let l:i -= 1
+            endif
         endwhile
         " Subtracting DAYS
         while l:i < 0
@@ -659,7 +662,9 @@ function! todo#DateAdd(year, month, day, units, unit_type)
                 let l:daysInMonth = todo#GetDaysInMonth(l:m, l:y)
                 let l:d = l:daysInMonth
             endif
-            let l:i += 1
+            if l:utype ==? "d" || todo#GetWeekday(l:y, l:m, l:d) < 6
+                let l:i += 1
+            endif
         endwhile
     elseif l:utype ==? "m"
         if l:d >= l:daysInMonth
@@ -710,6 +715,24 @@ function! todo#DateAdd(year, month, day, units, unit_type)
         let l:d = l:daysInMonth
     endif
     return [l:y, l:m, l:d]
+endfunction
+
+" function todo#GetWeekday {{{2
+function! todo#GetWeekday(year, month, day)
+  " Calculate the day of the week by Zeller's Congruence"
+  let year = a:year
+  let m = a:month
+  let d = a:day
+
+  if m < 3
+    let m += 12
+    let year -= 1
+  endif
+
+  let c = year / 100
+  let y = year % 100
+
+  return ((d + ((m + 1) * 26 / 10) + y + (y / 4) + ((5 * c) + (c / 4)) + 5) % 7) + 1
 endfunction
 
 " function todo#DateStringAdd {{{2
